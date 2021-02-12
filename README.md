@@ -1,4 +1,4 @@
-Source code for [Diffusion is All You Need for Learning on Surfaces](https://arxiv.org/abs/2012.00888)", by 
+Source code for ["Diffusion is All You Need for Learning on Surfaces"](https://arxiv.org/abs/2012.00888), by 
 - [Nicholas Sharp](https://nmwsharp.com/)
 - Souhaib Attaiki
 - [Keenan Crane](http://keenan.is/here)
