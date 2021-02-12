@@ -2,9 +2,9 @@ Source code for [Diffusion is All You Need for Learning on Surfaces](https://arx
 - [Nicholas Sharp](https://nmwsharp.com/)
 - Souhaib Attaiki
 - [Keenan Crane](http://keenan.is/here)
-- [Maks Ovsjanikov](http://www.lix.polytechnique.fr/~maks/) at ECCV 2020.
+- [Maks Ovsjanikov](http://www.lix.polytechnique.fr/~maks/)
 
-**NOTE:** the linked paper is a _preprint_, and this code should be viewed similarly. A full code release, including experimental details, will be provided after publication.
+**NOTE:** the linked paper is a _preprint_, and this code should be viewed similarly. A full code release, including experimental details, will be added after publication.
 
 
 ![network diagram](https://github.com/nmwsharp/diffusion-net/blob/master/media/diagram.jpg)
