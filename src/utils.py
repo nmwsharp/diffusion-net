@@ -24,6 +24,12 @@ def toNP(x):
     """
     return x.detach().to(torch.device('cpu')).numpy()
 
+def label_smoothing_log_loss(pred, labels, smoothing=0.0):
+    n_class = pred.shape[-1]
+    one_hot = torch.zeros_like(pred).scatter(1, labels.unsqueeze(1), 1)
+    one_hot = one_hot * (1 - smoothing) + (1 - one_hot) * smoothing / (n_class - 1)
+    loss = -(one_hot * pred).sum(dim=1).mean()
+    return loss
 
 
 # Randomly rotate points.
@@ -33,12 +39,6 @@ def random_rotate_points(pts, randgen=None):
     R = random_rotation_matrix(randgen) 
     R = torch.from_numpy(R).to(device=pts.device, dtype=pts.dtype)
     return torch.matmul(pts, R) 
-
-def cmatvecmul_stacked(mat, vec):
-    # mat: (B,M,N,2)
-    # vec: (B,N)
-    # return: (B,M,2)
-    return torch.stack((torch.matmul(mat[...,0], vec), torch.matmul(mat[...,1], vec)), dim=-1)
 
 # Numpy things
 
@@ -96,11 +96,6 @@ def random_rotation_matrix(randgen=None):
 
     M = (np.outer(V, V) - np.eye(3)).dot(R)
     return M
-
-# IO
-def read_mesh(f):
-    return igl.read_triangle_mesh(f)
-
 
 # Python string/file utilities
 def ensure_dir_exists(d):
