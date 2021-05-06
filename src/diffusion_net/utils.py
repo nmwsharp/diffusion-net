@@ -5,7 +5,7 @@ import time
 import torch
 import hashlib
 import numpy as np
-import igl
+import scipy
 
 
 # Default settings and config
@@ -48,7 +48,19 @@ def sparse_np_to_torch(A):
     values = Acoo.data
     indices = np.vstack((Acoo.row, Acoo.col))
     shape = Acoo.shape
-    return torch.sparse.FloatTensor(torch.LongTensor(indices), torch.FloatTensor(values), torch.Size(shape))
+    return torch.sparse.FloatTensor(torch.LongTensor(indices), torch.FloatTensor(values), torch.Size(shape)).coalesce()
+
+# Pytorch sparse to numpy csc matrix
+def sparse_torch_to_np(A):
+    if len(A.shape) != 2:
+        raise RuntimeError("should be a matrix-shaped type; dim is : " + str(A.shape))
+
+    indices = toNP(A.indices())
+    values = toNP(A.values())
+
+    mat = scipy.sparse.coo_matrix((values, indices), shape=A.shape).tocsc()
+
+    return mat
 
 
 # Hash a list of numpy arrays

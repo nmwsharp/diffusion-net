@@ -11,9 +11,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from utils import toNP
-import geometry
-import utils
+from .utils import toNP
+from .geometry import to_basis, from_basis
 
 class LearnedTimeDiffusion(nn.Module):
     """
@@ -57,7 +56,7 @@ class LearnedTimeDiffusion(nn.Module):
         if self.method == 'spectral':
 
             # Transform to spectral
-            x_spec = tsn.geometry.to_basis(x, evecs, mass)
+            x_spec = to_basis(x, evecs, mass)
 
             # Diffuse
             time = self.diffusion_time
@@ -65,7 +64,7 @@ class LearnedTimeDiffusion(nn.Module):
             x_diffuse_spec = diffusion_coefs * x_spec
 
             # Transform back to per-vertex 
-            x_diffuse = tsn.geometry.from_basis(x_diffuse_spec, evecs)
+            x_diffuse = from_basis(x_diffuse_spec, evecs)
             
         elif self.method == 'implicit_dense':
             V = x.shape[-2]
@@ -179,23 +178,23 @@ class DiffusionNetBlock(nn.Module):
 
         # Specified dimensions
         self.C_width = C_width
-        self mlp_hidden_dims = mlp_hidden_dims
+        self.mlp_hidden_dims = mlp_hidden_dims
 
         self.dropout = dropout
         self.with_gradient_features = with_gradient_features
         self.with_gradient_rotations = with_gradient_rotations
 
         # Diffusion block
-        self.diffusion = DiffusionBlock(self.C_width, method=diffusion_method)
+        self.diffusion = LearnedTimeDiffusion(self.C_width, method=diffusion_method)
         
         self.MLP_C = 2*self.C_width
       
-        if self.gradient_features:
+        if self.with_gradient_features:
             self.gradient_features = SpatialGradientFeatures(self.C_width, with_gradient_rotations=self.with_gradient_rotations)
             self.MLP_C += self.C_width
         
         # MLPs
-        self.mlp = MiniMLP([self.MLP_C] + self mlp_hidden_dims + [self.C_width], dropout=self.dropout)
+        self.mlp = MiniMLP([self.MLP_C] + self.mlp_hidden_dims + [self.C_width], dropout=self.dropout)
 
 
     def forward(self, x_in, mass, L, evals, evecs, gradX, gradY):
@@ -252,7 +251,7 @@ class DiffusionNet(nn.Module):
         Parameters:
             C_in (int):                     input dimension 
             C_out (int):                    output dimension 
-            last_activation (func)          a function to apply to the final outputs of the network, such as torch.nn.Softmax (default: None)
+            last_activation (func)          a function to apply to the final outputs of the network, such as torch.nn.functional.log_softmax (default: None)
             outputs_at (string)             produce outputs at various mesh elements by averaging from vertices. One of ['vertices', 'edges', 'faces']. (default 'vertices', aka points for a point cloud)
             C_width (int):                  dimension of internal DiffusionNet blocks (default: 128)
             N_block (int):                  number of DiffusionNet blocks (default: 4)
@@ -279,6 +278,8 @@ class DiffusionNet(nn.Module):
         if outputs_at not in ['vertices', 'edges', 'faces']: raise ValueError("invalid setting for outputs_at")
 
         # MLP options
+        if mlp_hidden_dims == None:
+            mlp_hidden_dims = [C_width, C_width]
         self.mlp_hidden_dims = mlp_hidden_dims
         self.dropout = dropout
         
@@ -289,10 +290,6 @@ class DiffusionNet(nn.Module):
         # Gradient features
         self.with_gradient_features = with_gradient_features
         self.with_gradient_rotations = with_gradient_rotations
-
-        # Diffusion block
-        self.diffusion = DiffusionBlock(self.C_width, method=diffusion_method)
-
         
         ## Set up the network
 
@@ -302,7 +299,7 @@ class DiffusionNet(nn.Module):
        
         # DiffusionNet blocks
         self.blocks = []
-        for i_block in range(n_block):
+        for i_block in range(self.N_block):
             block = DiffusionNetBlock(C_width = C_width,
                                       mlp_hidden_dims = mlp_hidden_dims,
                                       dropout = dropout,
@@ -313,9 +310,6 @@ class DiffusionNet(nn.Module):
             self.blocks.append(block)
             self.add_module("block_"+str(i_block), self.blocks[-1])
 
-        
-        # MLPs
-        self.mlp = MiniMLP([self.MLP_C] + self mlp_hidden_dims + [self.C_width], dropout=self.dropout)
     
     def forward(self, x_in, mass, L=None, evals=None, evecs=None, gradX=None, gradY=None, edges=None, faces=None):
         """
@@ -346,9 +340,10 @@ class DiffusionNet(nn.Module):
 
 
         ## Check dimensions, and append batch dimension if not given
-        if x_in.shape[-1] != self.C_in: raise ValueError("DiffusionNet was constructed with C_in={}, but x_in has last dim={}".format(self.C_in,x_in.shape[-1])
+        if x_in.shape[-1] != self.C_in: 
+            raise ValueError("DiffusionNet was constructed with C_in={}, but x_in has last dim={}".format(self.C_in,x_in.shape[-1]))
         N = x_in.shape[-2]
-        elif len(x_in.shape) == 2:
+        if len(x_in.shape) == 2:
             appended_batch_dim = True
 
             # add a batch dim to all inputs
@@ -368,7 +363,7 @@ class DiffusionNet(nn.Module):
         else: raise ValueError("x_in should be tensor with shape [N,C] or [B,N,C]")
         
         # Apply the first linear layer
-        x = self.first_lin(x)
+        x = self.first_lin(x_in)
       
         # Apply each of the blocks
         for b in self.blocks:
@@ -396,7 +391,7 @@ class DiffusionNet(nn.Module):
             x_out = torch.mean(xf, dim=-1)
         
         # Apply last nonlinearity if specified
-        if self.last_activation
+        if self.last_activation != None:
             x_out = self.last_activation(x_out)
 
         # Remove batch dim if we added it

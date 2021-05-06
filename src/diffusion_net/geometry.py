@@ -11,16 +11,13 @@ import numpy as np
 import scipy.spatial
 import torch
 from torch.distributions.categorical import Categorical
-import igl
 import sklearn.neighbors
 
 import robust_laplacian
 import potpourri3d as pp3d
 
-import utils
-from utils import toNP
-
-
+import diffusion_net.utils as utils
+from .utils import toNP
 
 
 def norm(x, highdim=False):
@@ -100,6 +97,19 @@ def neighborhood_normal(points):
     normal = vh[:,2,:]
     return normal / np.linalg.norm(normal,axis=-1, keepdims=True)
 
+def mesh_vertex_normals(verts, faces):
+    # numpy in / out
+    face_n = toNP(face_normals(torch.tensor(verts), torch.tensor(faces))) # ugly torch <---> numpy
+
+    vertex_normals = np.zeros(verts.shape)
+    for i in range(3):
+        np.add.at(vertex_normals, faces[:,i], face_n)
+
+    vertex_normals = vertex_normals / np.linalg.norm(vertex_normals,axis=-1,keepdims=True)
+
+    return vertex_normals
+
+
 def vertex_normals(verts, faces, n_neighbors_cloud=30):
     verts_np = toNP(verts)
 
@@ -112,7 +122,7 @@ def vertex_normals(verts, faces, n_neighbors_cloud=30):
 
     else: # mesh
 
-        normals = igl.per_vertex_normals(verts_np, toNP(faces))
+        normals = mesh_vertex_normals(verts_np, toNP(faces))
 
         # if any are NaN, wiggle slightly and recompute
         bad_normals_mask = np.isnan(normals).any(axis=1, keepdims=True)
@@ -121,7 +131,7 @@ def vertex_normals(verts, faces, n_neighbors_cloud=30):
             scale = np.linalg.norm(bbox) * 1e-4
             wiggle = (np.random.RandomState(seed=777).rand(*verts.shape)-0.5) * scale
             wiggle_verts = verts_np + bad_normals_mask * wiggle
-            normals = igl.per_vertex_normals(wiggle_verts, toNP(faces))
+            normals = mesh_vertex_normals(wiggle_verts, toNP(faces))
 
         # if still NaN assign random normals (probably means unreferenced verts in mesh)
         bad_normals_mask = np.isnan(normals).any(axis=1)
@@ -161,13 +171,7 @@ def build_tangent_frames(verts, faces, normals=None):
     frames = torch.stack((basisX, basisY, vert_normals), dim=-2)
     
     if torch.any(torch.isnan(frames)):
-
-        if torch.any(torch.isnan(vert_normals)):
-            print("NaN Z")
-        if torch.any(torch.isnan(basisX)):
-            print("NaN X")
-        if torch.any(torch.isnan(basisY)):
-            print("NaN Y")
+        raise ValueError("NaN coordinate frame! Must be very degenerate")
 
     return frames
         
@@ -335,7 +339,6 @@ def compute_operators(verts, faces, k_eig, normals=None):
         L_eigsh = (L + scipy.sparse.identity(L.shape[0])*eps).tocsc()
         massvec_eigsh = massvec_np
         Mmat = scipy.sparse.diags(massvec_eigsh)
-        use_cholesky = have_sksparse
         eigs_sigma = eps
 
         failcount = 0
@@ -388,7 +391,7 @@ def compute_operators(verts, faces, k_eig, normals=None):
     return frames, massvec, L, evals, evecs, gradX, gradY
 
 
-def get_all_operators(opts, verts_list, faces_list):
+def get_all_operators(verts_list, faces_list, k_eig, op_cache_dir=None):
     N = len(verts_list)
             
     frames = [None] * N
@@ -405,7 +408,7 @@ def get_all_operators(opts, verts_list, faces_list):
    
     for num, i in enumerate(inds):
         print("get_all_operators() processing {} / {} {:.3f}%".format(num, N, num / N * 100))
-        outputs = get_operators(opts, verts_list[i], faces_list[i], opts.k_eig)
+        outputs = get_operators(verts_list[i], faces_list[i], k_eig, op_cache_dir)
         frames[i] = outputs[0]
         massvec[i] = outputs[1]
         L[i] = outputs[2]
@@ -416,7 +419,7 @@ def get_all_operators(opts, verts_list, faces_list):
         
     return frames, massvec, L, evals, evecs, gradX, gradY
 
-def get_operators(opts, verts, faces, k_eig, normals=None, overwrite_cache=False, truncate_cache=False):
+def get_operators(verts, faces, k_eig, op_cache_dir=None, normals=None, overwrite_cache=False, truncate_cache=False):
     """
     See documentation for compute_operators(). This essentailly just wraps a call to compute_operators, using a cache if possible.
     All arrays are always computed using double precision for stability, then truncated to single precision floats to store on disk, and finally returned as a tensor with dtype/device matching the `verts` input.
@@ -424,7 +427,6 @@ def get_operators(opts, verts, faces, k_eig, normals=None, overwrite_cache=False
 
     device = verts.device
     dtype = verts.dtype
-    dtype_complex = utils.complex_dtype_equiv(dtype)
     verts_np = toNP(verts)
     faces_np = toNP(faces)
     is_cloud = faces.numel() == 0
@@ -439,8 +441,8 @@ def get_operators(opts, verts, faces, k_eig, normals=None, overwrite_cache=False
     #         entries in this cache. The good news is that that is totally fine, and at most slightly
     #         slows performance with rare extra cache misses.
     found = False
-    if opts.eigensystem_cache_dir is not None:
-        utils.ensure_dir_exists(opts.eigensystem_cache_dir)
+    if op_cache_dir is not None:
+        utils.ensure_dir_exists(op_cache_dir)
         hash_key_str = str(utils.hash_arrays((verts_np, faces_np)))
         # print("Building operators for input with hash: " + hash_key_str)
 
@@ -451,7 +453,7 @@ def get_operators(opts, verts, faces, k_eig, normals=None, overwrite_cache=False
 
             # Form the name of the file to check
             search_path = os.path.join(
-                opts.eigensystem_cache_dir,
+                op_cache_dir,
                 hash_key_str + "_" + str(i_cache_search) + ".npz")
             
             try:
@@ -556,7 +558,7 @@ def get_operators(opts, verts, faces, k_eig, normals=None, overwrite_cache=False
         dtype_np = np.float32
 
         # Store it in the cache
-        if opts.eigensystem_cache_dir is not None:
+        if op_cache_dir is not None:
 
             L_np = utils.sparse_torch_to_np(L).astype(dtype_np)
             gradX_np = utils.sparse_torch_to_np(gradX).astype(dtype_np)
@@ -623,10 +625,26 @@ def compute_hks(evals, evecs, scales):
     Outputs:
       - (V,S) hks values
     """
+
+    # expand batch
+    if len(evals.shape) == 1:
+        expand_batch = True
+        evals = evals.unsqueeze(0)
+        evecs = evecs.unsqueeze(0)
+        scales = scales.unsqueeze(0)
+    else:
+        expand_batch = False
+
     # TODO could be a matmul
     power_coefs = torch.exp(-evals.unsqueeze(1) * scales.unsqueeze(-1)).unsqueeze(1) # (B,1,S,K)
     terms = power_coefs * (evecs * evecs).unsqueeze(2)  # (B,V,S,K)
-    return torch.sum(terms, dim=-1) # (B,V,S)
+
+    out = torch.sum(terms, dim=-1) # (B,V,S)
+
+    if expand_batch:
+        return out.squeeze(0)
+    else:
+        return out
 
 def compute_hks_autoscale(evals, evecs, count):
     # these scales roughly approximate those suggested in the hks paper
@@ -739,34 +757,24 @@ def farthest_point_sampling(points, n_sample):
     return chosen_mask
 
 
-class NormalizeAreaScale(object):
+def normalize_area_scale(verts, faces):
     """
-    Like torch_geometric.transforms.NormalizeScale, but scales to unit surface area
+    Normalizes a mesh by applying a uniform scaling such that it has surface area 0.
+    Returns only the new vertices, faces are unchagned.
     """
 
-    def __init__(self):
-        self.center = torch_geometric.transforms.Center()
+    # compute total surface area
+    coords = face_coords(verts, faces)
+    vec_A = coords[:, 1, :] - coords[:, 0, :]
+    vec_B = coords[:, 2, :] - coords[:, 0, :]
+    face_areas = norm(cross(vec_A, vec_B)) * 0.5
+    total_area = torch.sum(face_areas)
 
-    def __call__(self, data):
-        data = self.center(data)
+    # scale
+    scale = (1 / torch.sqrt(total_area))
+    verts = verts * scale
 
-        # compute total surface area
-        verts = data.pos
-        faces = data.face.transpose(0,1).contiguous()
-        coords = face_coords(verts, faces)
-        vec_A = coords[:, 1, :] - coords[:, 0, :]
-        vec_B = coords[:, 2, :] - coords[:, 0, :]
-        face_areas = norm(cross(vec_A, vec_B)) * 0.5
-        total_area = torch.sum(face_areas)
-        # print("total_area = " + str(total_area))
-
-        scale = (1 / torch.sqrt(total_area))
-        data.pos = data.pos * scale
-
-        return data
-
-    def __repr__(self):
-        return '{}()'.format(self.__class__.__name__)
+    return verts
 
 
 
@@ -801,6 +809,8 @@ def geodesic_label_errors(opts, target_verts, target_faces, pred_labels, gt_labe
 
 # This function and the helper class below are to support parallel computation of all-pairs geodesic distance
 def all_pairs_geodesic_worker(verts, faces, i):
+    import igl
+
     N = verts.shape[0]
 
     sources = np.array([i])[:,np.newaxis]
