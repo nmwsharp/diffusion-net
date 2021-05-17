@@ -54,7 +54,8 @@ model = diffusion_net.layers.DiffusionNet(
             C_in=C_in,
             C_out=n_class,
             C_width=128, # internal size of the diffusion net. 32 -- 512 is a reasonable range
-            last_activation=lambda x : torch.nn.functional.log_softmax(x,dim=-1), # apply a last softmax to outputs (set to default None to output general values in R^{N x C_out})
+            last_activation=lambda x : torch.nn.functional.log_softmax(x,dim=-1), # apply a last softmax to outputs 
+                                                                                  # (set to default None to output general values in R^{N x C_out})
             outputs_at='vertices')
 
 # An example epoch loop.
@@ -62,7 +63,7 @@ model = diffusion_net.layers.DiffusionNet(
 for sample in your_dataset:
     
     verts = sample.vertices  # (Vx3 array of vertices)
-    faces = sample.faces 	 # (Fx3 array of faces, None for point cloud) 
+    faces = sample.faces     # (Fx3 array of faces, None for point cloud) 
     
     # center and unit scale
     verts = diffusion_net.geometry.normalize_positions(verts)
@@ -72,16 +73,17 @@ for sample in your_dataset:
     # TIP: Do this once in a dataloader and store in memory to further improve 
     # performance; see examples.
     frames, mass L, evals, evecs, gradX, gradY = \
-    	get_operators(verts, faces, op_cache_dir='my/cache/directory/')
+        get_operators(verts, faces, op_cache_dir='my/cache/directory/')
     
     # this example uses vertex positions as features 
     features = verts
     
-   	# Forward-evaluate the model
-	outputs = model(features, mass, L=L, evals=evals, evecs=evecs, gradX=gradX, gradY=gradY, faces=faces)
+    # Forward-evaluate the model
     # preds is a NxC_out array of values
+    outputs = model(features, mass, L=L, evals=evals, evecs=evecs, gradX=gradX, gradY=gradY, faces=faces)
     
-    # Now do whatever you want! Apply your favorite loss function, backpropgate with loss.backward() to train the DiffusionNet, etc. 
+    # Now do whatever you want! Apply your favorite loss function, 
+    # backpropgate with loss.backward() to train the DiffusionNet, etc. 
 ```
 
 See the examples in `experiments/` for complete examples, including dataloaders, other features, optimizers, etc. Please feel free to file an issue to discuss applying DiffusionNet to your problem!
