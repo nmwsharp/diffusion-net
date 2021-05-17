@@ -419,7 +419,7 @@ def get_all_operators(verts_list, faces_list, k_eig, op_cache_dir=None):
         
     return frames, massvec, L, evals, evecs, gradX, gradY
 
-def get_operators(verts, faces, k_eig, op_cache_dir=None, normals=None, overwrite_cache=False, truncate_cache=False):
+def get_operators(verts, faces, k_eig=128, op_cache_dir=None, normals=None, overwrite_cache=False, truncate_cache=False):
     """
     See documentation for compute_operators(). This essentailly just wraps a call to compute_operators, using a cache if possible.
     All arrays are always computed using double precision for stability, then truncated to single precision floats to store on disk, and finally returned as a tensor with dtype/device matching the `verts` input.
