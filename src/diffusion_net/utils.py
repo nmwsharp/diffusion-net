@@ -5,7 +5,7 @@ import time
 import torch
 import hashlib
 import numpy as np
-import igl
+import scipy
 
 
 # Default settings and config
@@ -24,6 +24,12 @@ def toNP(x):
     """
     return x.detach().to(torch.device('cpu')).numpy()
 
+def label_smoothing_log_loss(pred, labels, smoothing=0.0):
+    n_class = pred.shape[-1]
+    one_hot = torch.zeros_like(pred).scatter(1, labels.unsqueeze(1), 1)
+    one_hot = one_hot * (1 - smoothing) + (1 - one_hot) * smoothing / (n_class - 1)
+    loss = -(one_hot * pred).sum(dim=1).mean()
+    return loss
 
 
 # Randomly rotate points.
@@ -34,12 +40,6 @@ def random_rotate_points(pts, randgen=None):
     R = torch.from_numpy(R).to(device=pts.device, dtype=pts.dtype)
     return torch.matmul(pts, R) 
 
-def cmatvecmul_stacked(mat, vec):
-    # mat: (B,M,N,2)
-    # vec: (B,N)
-    # return: (B,M,2)
-    return torch.stack((torch.matmul(mat[...,0], vec), torch.matmul(mat[...,1], vec)), dim=-1)
-
 # Numpy things
 
 # Numpy sparse matrix to pytorch
@@ -48,7 +48,19 @@ def sparse_np_to_torch(A):
     values = Acoo.data
     indices = np.vstack((Acoo.row, Acoo.col))
     shape = Acoo.shape
-    return torch.sparse.FloatTensor(torch.LongTensor(indices), torch.FloatTensor(values), torch.Size(shape))
+    return torch.sparse.FloatTensor(torch.LongTensor(indices), torch.FloatTensor(values), torch.Size(shape)).coalesce()
+
+# Pytorch sparse to numpy csc matrix
+def sparse_torch_to_np(A):
+    if len(A.shape) != 2:
+        raise RuntimeError("should be a matrix-shaped type; dim is : " + str(A.shape))
+
+    indices = toNP(A.indices())
+    values = toNP(A.values())
+
+    mat = scipy.sparse.coo_matrix((values, indices), shape=A.shape).tocsc()
+
+    return mat
 
 
 # Hash a list of numpy arrays
@@ -96,11 +108,6 @@ def random_rotation_matrix(randgen=None):
 
     M = (np.outer(V, V) - np.eye(3)).dot(R)
     return M
-
-# IO
-def read_mesh(f):
-    return igl.read_triangle_mesh(f)
-
 
 # Python string/file utilities
 def ensure_dir_exists(d):
