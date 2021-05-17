@@ -2,20 +2,20 @@ This directory contains examples and scripts to reproduce experiments from the [
 
 **Note:** These are being gradually populated. File an issue issue if there's one you'd like to request ASAP!
 
-- Classification
+- **Classification**
   - SHREC11
     - Original meshes (coming soon!)
     - Simplified meshes (coming soon!)
-- Segmentation
+- **Segmentation**
   - RNA Molecules
     - Meshes (coming soon!)
     - Point clouds (coming soon!)
   - Maron et al. Human Segmentation Dataset
-    - [Original meshes]()
+    - [Original meshes](https://github.com/nmwsharp/diffusion-net/tree/master/experiments/human_segmentation_original/)
     - Simplified meshes, soft ground truth on edges (coming soon!)
     - Simplified meshes, ground truth on faces (coming soon!)
-- Correspondence
-  - Supervised functional correspondence on FAUST/SCAPE
-  - Weakly-supervised functional correspondence on FAUST/SCAPE
-- Sampling invariance
-  - Resampled FAUST test set
+- **Correspondence**
+  - Supervised functional correspondence on FAUST/SCAPE (coming soon!)
+  - Weakly-supervised functional correspondence on FAUST/SCAPE (coming soon!)
+- **Sampling invariance**
+  - Resampled FAUST test set (coming soon!)
