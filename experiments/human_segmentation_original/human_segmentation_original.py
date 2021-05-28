@@ -3,7 +3,7 @@ import sys
 import argparse
 import torch
 from torch.utils.data import DataLoader
-import progressbar
+from tqdm import tqdm
 import numpy as np
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/"))  # add the path to the DiffusionNet src
@@ -102,7 +102,7 @@ def train_epoch(epoch):
     
     correct = 0
     total_num = 0
-    for data in progressbar.progressbar(train_loader):
+    for data in tqdm(train_loader):
 
         # Get data
         verts, faces, frames, mass, L, evals, evecs, gradX, gradY, labels = data
@@ -160,7 +160,7 @@ def test():
     total_num = 0
     with torch.no_grad():
     
-        for data in progressbar.progressbar(test_loader):
+        for data in tqdm(test_loader):
 
             # Get data
             verts, faces, frames, mass, L, evals, evecs, gradX, gradY, labels = data
