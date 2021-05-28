@@ -29,7 +29,7 @@ DiffusionNet is described in the paper ["DiffusionNet: Discretization Agnostic L
 DiffusionNet depends on pytorch, as well as a handful of other fairly typical numerical packages. These can usually be installed manually without much trouble, but alternately a conda environment file is also provided (see conda documentation for additional instructions). These package versions were tested with CUDA 10.1 and 11.1. 
 
 ```
-conda env create -f environment.yml
+conda env create --name diffusion_net -f environment.yml
 ```
 
 The code assumes a GPU with CUDA support. DiffusionNet has minimal memory requirements; >4GB GPU memory should be sufficient. 
