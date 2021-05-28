@@ -72,7 +72,7 @@ for sample in your_dataset:
     # automatically populates a cache, precomputing only if needed.
     # TIP: Do this once in a dataloader and store in memory to further improve 
     # performance; see examples.
-    frames, mass L, evals, evecs, gradX, gradY = \
+    frames, mass, L, evals, evecs, gradX, gradY = \
         get_operators(verts, faces, op_cache_dir='my/cache/directory/')
     
     # this example uses vertex positions as features 
