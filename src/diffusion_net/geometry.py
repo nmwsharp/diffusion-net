@@ -391,7 +391,7 @@ def compute_operators(verts, faces, k_eig, normals=None):
     return frames, massvec, L, evals, evecs, gradX, gradY
 
 
-def get_all_operators(verts_list, faces_list, k_eig, op_cache_dir=None):
+def get_all_operators(verts_list, faces_list, k_eig, op_cache_dir=None, normals=None):
     N = len(verts_list)
             
     frames = [None] * N
@@ -408,7 +408,10 @@ def get_all_operators(verts_list, faces_list, k_eig, op_cache_dir=None):
    
     for num, i in enumerate(inds):
         print("get_all_operators() processing {} / {} {:.3f}%".format(num, N, num / N * 100))
-        outputs = get_operators(verts_list[i], faces_list[i], k_eig, op_cache_dir)
+        if normals is None:
+            outputs = get_operators(verts_list[i], faces_list[i], k_eig, op_cache_dir)
+        else:
+            outputs = get_operators(verts_list[i], faces_list[i], k_eig, op_cache_dir, normals=normals[i])
         frames[i] = outputs[0]
         massvec[i] = outputs[1]
         L[i] = outputs[2]
