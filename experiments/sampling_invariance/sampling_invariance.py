@@ -44,8 +44,8 @@ augment_random_rotate = (input_features == 'xyz')
 # Important paths
 base_path = os.path.dirname(__file__)
 op_cache_dir = os.path.join(base_path, "data", "op_cache")
-pretrain_path = os.path.join(base_path, "pretrained_models/human_seg_{}_4x128.pth".format(input_features))
-model_save_path = os.path.join(base_path, "data/saved_models/human_seg_{}_4x128.pth".format(input_features))
+pretrain_path = os.path.join(base_path, "pretrained_models/categorical_correspondence_{}_4x256.pth".format(input_features))
+model_save_path = os.path.join(base_path, "data/saved_models/categorical_correspondence_{}_4x256.pth".format(input_features))
 dataset_path = os.path.join(base_path, "data")
 
 

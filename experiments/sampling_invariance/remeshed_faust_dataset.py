@@ -109,6 +109,8 @@ class RemeshedFaustDataset(Dataset):
                         faces = np.zeros((0,3), dtype=np.int64)
                         normals = np.stack(([data['vertex'][axis] for axis in ['nx', 'ny', 'nz']]), axis=-1)
                         normals = torch.tensor(np.ascontiguousarray(normals)).float()
+                        
+                        labels = torch.from_numpy(np.loadtxt(labels_fullpath))
 
                     else:
                         # Load all the rest from the remeshed/sampled benchmark
