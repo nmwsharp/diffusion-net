@@ -6,9 +6,11 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
 
+
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/"))  # add the path to the DiffusionNet src
 import diffusion_net
-from remeshed_faust_dataset import RemeshedFaustDataset
+from faust_with_robust_test_dataset import FaustWithRobustTestDataset
 
 
 # === Options
@@ -16,7 +18,7 @@ from remeshed_faust_dataset import RemeshedFaustDataset
 # Parse a few args
 parser = argparse.ArgumentParser()
 parser.add_argument("--evaluate", action="store_true", help="evaluate using the pretrained model")
-parser.add_argument("--input_features", type=str, help="what features to use as input ('xyz' or 'hks') default: hks", default = 'hks')
+parser.add_argument("--input_features", type=str, help="what features to use as input ('xyz' or 'hks') default: xyz", default = 'xyz')
 args = parser.parse_args()
 
 
@@ -44,6 +46,7 @@ augment_random_rotate = (input_features == 'xyz')
 # Important paths
 base_path = os.path.dirname(__file__)
 op_cache_dir = os.path.join(base_path, "data", "op_cache")
+geodesic_cache_dir = os.path.join(base_path, "data", "geodesic_cache") # for evaluating error metrics
 pretrain_path = os.path.join(base_path, "pretrained_models/categorical_correspondence_{}_4x256.pth".format(input_features))
 model_save_path = os.path.join(base_path, "data/saved_models/categorical_correspondence_{}_4x256.pth".format(input_features))
 dataset_path = os.path.join(base_path, "data")
@@ -52,14 +55,17 @@ dataset_path = os.path.join(base_path, "data")
 # === Load datasets
 
 # Load the test dataset
-test_dataset = RemeshedFaustDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
+test_dataset = FaustWithRobustTestDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
 test_loader = DataLoader(test_dataset, batch_size=None)
 
 # Load the train dataset
-if train:
-    train_dataset = RemeshedFaustDataset(dataset_path, train=True, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
-    train_loader = DataLoader(train_dataset, batch_size=None, shuffle=True)
+train_dataset = FaustWithRobustTestDataset(dataset_path, train=True, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
+train_loader = DataLoader(train_dataset, batch_size=None, shuffle=True)
 
+# Use the first shape in the training dataset as the reference model (used for measuring geodesic error below)
+verts_ref, faces_ref = train_dataset[0][:2]
+verts_ref.requires_grad = False
+faces_ref.requires_grad = False
 
 
 # === Create the model
@@ -81,6 +87,7 @@ if not train:
     # load the pretrained model
     print("Loading pretrained model from: " + str(pretrain_path))
     model.load_state_dict(torch.load(pretrain_path))
+    print("...done")
 
 
 # === Optimize
@@ -105,7 +112,7 @@ def train_epoch(epoch):
     for data in tqdm(train_loader):
 
         # Get data
-        verts, faces, frames, mass, L, evals, evecs, gradX, gradY, labels = data
+        verts, faces, frames, mass, L, evals, evecs, gradX, gradY, labels, _ = data
 
         # Move to device
         verts = verts.to(device)
@@ -121,7 +128,8 @@ def train_epoch(epoch):
         
         # Randomly rotate positions
         if augment_random_rotate:
-            verts = diffusion_net.utils.random_rotate_points(verts)
+            # Rotate about up (Y-axis) only
+            verts = diffusion_net.utils.random_rotate_points_y(verts)
 
         # Construct features
         if input_features == 'xyz':
@@ -130,7 +138,7 @@ def train_epoch(epoch):
             features = diffusion_net.geometry.compute_hks_autoscale(evals, evecs, 16)
 
         # Apply the model
-        preds = model(features, mass, L=L, evals=evals, evecs=evecs, gradX=gradX, gradY=gradY, faces=faces)
+        preds = model(features, mass, L=L, evals=evals, evecs=evecs, gradX=gradX, gradY=gradY)
 
         # Evaluate loss
         loss = torch.nn.functional.nll_loss(preds, labels)
@@ -152,19 +160,27 @@ def train_epoch(epoch):
 
 
 # Do an evaluation pass on the test dataset 
-def test():
+def test(with_geodesic_error=False):
+
+    if with_geodesic_error:
+        print("Evaluating geodesic error metrics")
     
     model.eval()
     
     correct = 0
     total_num = 0
     with torch.no_grad():
-    
+
+        # If measuring geodesic error, keep track of it (for each type of mutation)
+        mut_geodesic_errors = {}
+   
+        i = 0
         for data in tqdm(test_loader):
 
             # Get data
-            verts, faces, frames, mass, L, evals, evecs, gradX, gradY, labels = data
+            verts, faces, frames, mass, L, evals, evecs, gradX, gradY, labels, mut = data
 
+               
             # Move to device
             verts = verts.to(device)
             faces = faces.to(device)
@@ -184,7 +200,7 @@ def test():
                 features = diffusion_net.geometry.compute_hks_autoscale(evals, evecs, 16)
 
             # Apply the model
-            preds = model(features, mass, L=L, evals=evals, evecs=evecs, gradX=gradX, gradY=gradY, faces=faces)
+            preds = model(features, mass, L=L, evals=evals, evecs=evecs, gradX=gradX, gradY=gradY)
 
             # track accuracy
             pred_labels = torch.max(preds, dim=1).indices
@@ -192,6 +208,21 @@ def test():
             this_num = labels.shape[0]
             correct += this_correct
             total_num += this_num
+
+            if with_geodesic_error:
+
+                pred_labels = torch.max(preds, dim=-1).indices
+                errors = diffusion_net.geometry.geodesic_label_errors(verts_ref, faces_ref, pred_labels, labels, normalization='diameter', geodesic_cache_dir=geodesic_cache_dir)
+
+                if mut not in mut_geodesic_errors:
+                    mut_geodesic_errors[mut] = []
+                mut_geodesic_errors[mut].extend(errors)
+
+
+        if with_geodesic_error:
+            print("\n== Geodesic errors ==")
+            for mut in mut_geodesic_errors:
+                print("    {:>8}  mean: {:.2f}".format(mut, 100*np.mean(mut_geodesic_errors[mut])))
 
     test_acc = correct / total_num
     return test_acc 
@@ -210,5 +241,5 @@ if train:
 
 
 # Test
-test_acc = test()
+test_acc = test(with_geodesic_error=True)
 print("Overall test accuracy: {:06.3f}%".format(100*test_acc))

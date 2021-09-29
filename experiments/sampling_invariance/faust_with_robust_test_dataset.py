@@ -15,8 +15,8 @@ import diffusion_net
 from diffusion_net.utils import toNP
 
 
-class RemeshedFaustDataset(Dataset):
-    """Remeshed FAUST correspondence dataset. Target data is vertex indices on the template mesh. Training data is original FAUST models, testing data are remeshed versions according to several strategies to measure discretization invariance, from https://github.com/nmwsharp/discretization-robust-correspondence-benchmark"""
+class FaustWithRobustTestDataset(Dataset):
+    """FAUST correspondence dataset, with robust test. Target data is vertex indices on the template mesh. Training data is original FAUST models, testing data are remeshed versions according to several strategies to measure discretization invariance, from https://github.com/nmwsharp/discretization-robust-correspondence-benchmark"""
 
     def __init__(self, root_dir, train, k_eig=128, use_cache=True, op_cache_dir=None):
 
@@ -32,6 +32,7 @@ class RemeshedFaustDataset(Dataset):
         self.faces_list = []
         self.normals_list = []
         self.labels_list = []  # per-vertex labels!!
+        self.mut_list = []     # for the test dataset, which mutation is it
 
         # check the cache
         if use_cache:
@@ -41,7 +42,7 @@ class RemeshedFaustDataset(Dataset):
             print("using dataset cache path: " + str(load_cache))
             if os.path.exists(load_cache):
                 print("  --> loading dataset from cache")
-                self.verts_list, self.faces_list, self.normals_list, self.frames_list, self.massvec_list, self.L_list, self.evals_list, self.evecs_list, self.gradX_list, self.gradY_list, self.labels_list = torch.load( load_cache)
+                self.verts_list, self.faces_list, self.normals_list, self.frames_list, self.massvec_list, self.L_list, self.evals_list, self.evecs_list, self.gradX_list, self.gradY_list, self.labels_list, self.mut_list = torch.load(load_cache)
                 return
             print("  --> dataset not in cache, repopulating")
 
@@ -76,6 +77,7 @@ class RemeshedFaustDataset(Dataset):
                 self.faces_list.append(faces)
                 self.normals_list.append(normals)
                 self.labels_list.append(labels)
+                self.mut_list.append(None)
 
                 print("loaded {} train meshes".format(len(self.verts_list)))
         else:
@@ -109,8 +111,8 @@ class RemeshedFaustDataset(Dataset):
                         faces = np.zeros((0,3), dtype=np.int64)
                         normals = np.stack(([data['vertex'][axis] for axis in ['nx', 'ny', 'nz']]), axis=-1)
                         normals = torch.tensor(np.ascontiguousarray(normals)).float()
-                        
-                        labels = torch.from_numpy(np.loadtxt(labels_fullpath))
+
+                        labels = torch.from_numpy(np.loadtxt(labels_fullpath, dtype=np.int64))
 
                     else:
                         # Load all the rest from the remeshed/sampled benchmark
@@ -119,7 +121,7 @@ class RemeshedFaustDataset(Dataset):
                         labels_fullpath = os.path.join(test_dirpath_base, method, "tr_reg_{}_{:03d}.txt".format(method, i))
                         
                         verts, faces = pp3d.read_mesh(mesh_fullpath)
-                        labels = torch.from_numpy(np.loadtxt(labels_fullpath))
+                        labels = torch.from_numpy(np.loadtxt(labels_fullpath, dtype=np.int64))
                         normals = None
 
                     # convert to torch
@@ -133,6 +135,7 @@ class RemeshedFaustDataset(Dataset):
                     self.faces_list.append(faces)
                     self.normals_list.append(normals)
                     self.labels_list.append(labels)
+                    self.mut_list.append(method)
 
             
 
@@ -145,10 +148,10 @@ class RemeshedFaustDataset(Dataset):
         # save to cache
         if use_cache:
             diffusion_net.utils.ensure_dir_exists(self.cache_dir)
-            torch.save((self.verts_list, self.faces_list, self.normals_list, self.frames_list, self.massvec_list, self.L_list, self.evals_list, self.evecs_list, self.gradX_list, self.gradY_list, self.labels_list), load_cache)
+            torch.save((self.verts_list, self.faces_list, self.normals_list, self.frames_list, self.massvec_list, self.L_list, self.evals_list, self.evecs_list, self.gradX_list, self.gradY_list, self.labels_list, self.mut_list), load_cache)
 
     def __len__(self):
         return len(self.verts_list)
 
     def __getitem__(self, idx):
-        return self.verts_list[idx], self.faces_list[idx], self.frames_list[idx], self.massvec_list[idx], self.L_list[idx], self.evals_list[idx], self.evecs_list[idx], self.gradX_list[idx], self.gradY_list[idx], self.labels_list[idx]
+        return self.verts_list[idx], self.faces_list[idx], self.frames_list[idx], self.massvec_list[idx], self.L_list[idx], self.evals_list[idx], self.evecs_list[idx], self.gradX_list[idx], self.gradY_list[idx], self.labels_list[idx], self.mut_list[idx]
