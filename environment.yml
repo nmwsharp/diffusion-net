@@ -23,6 +23,7 @@ dependencies:
     - joblib==1.0.1
     - numpy==1.20.2
     - pillow==8.2.0
+    - plyfile==0.7.2
     - polyscope==0.1.6
     - potpourri3d==0.0.3
     - python-utils==2.5.6
