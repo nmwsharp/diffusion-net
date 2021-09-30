@@ -23,7 +23,7 @@ This benchmark is described in detail here: https://github.com/nmwsharp/discreti
     - `data/test/data/iso/tr_reg_iso_080.ply`
   etc. This folder structure is a bit weird, we use it because it is the default resulting from unzipping/cloning the datasets above.
 
-  (Note that we do not use most of the data from the MPI-FAUST dataset, just the registered templates)
+  (Note that we do not use most of the data from the MPI-FAUST dataset, just the registered templates.)
 
 
 ### Training from scratch
@@ -33,11 +33,11 @@ To train the models, use:
 ```python
 python sampling_invariance.py
 ```
-which trains on the ordinary FAUST registered templates, then tests on the remeshed meshes & point cloud as described above.  The training script prints the fraction of vertices which were classified exacatly correctly; this is not a very meaningful metric, just something to give feedback during training. After the last epoch, error on the test set is reported as measured by geodesic distance along the surface between the predicted correspondence and correct correspondence.
+which trains on the ordinary FAUST registered templates, then tests on the remeshed meshes & point cloud as described above.  The training script prints the fraction of vertices which were classified exacatly correctly; this is not a very meaningful metric, just something to give feedback during training. After the last epoch, error on the test set is reported as measured by geodesic distance along the surface between the predicted correspondence and correct correspondence, a much more meaningful metric.
 
 ### Evaluating pretrained models
 
-Likewise, a pretrained models is included in `/pretrained_models`. You can load it and evaluate on the test set like:
+Likewise, a pretrained model is included in `/pretrained_models`. You can load it and evaluate on the test set like:
 
 ```python
 python sampling_invariance.py --evaluate
