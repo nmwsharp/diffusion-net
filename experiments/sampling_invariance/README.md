@@ -6,11 +6,11 @@ This benchmark is described in detail here: https://github.com/nmwsharp/discreti
 
 ### Data
 
-  The **training** data comes from the MPI-FAUST dataset, which can be [accessed here](http://faust.is.tue.mpg.de/).
+  The **training** data comes from the registered templates in the MPI-FAUST dataset, which can be [accessed here](http://faust.is.tue.mpg.de/).
 
   The **testing** data is the FAUST test meshes, remeshed according to several strategies. They can be accessed from [this repository](https://github.com/nmwsharp/discretization-robust-correspondence-benchmark).
 
-  Quick setup: (run from this directory)
+  Quick data download: (run from this directory)
   ```sh
   mkdir data
   mkdir data/train
@@ -21,34 +21,24 @@ This benchmark is described in detail here: https://github.com/nmwsharp/discreti
   The data should then be laid out such that the train and test meshes are located in
     - `data/train/MPI-FAUST/training/registrations/tr_reg_000.ply`
     - `data/test/data/iso/tr_reg_iso_080.ply`
-  etc.
+  etc. This folder structure is a bit weird, we use it because it is the default resulting from unzipping/cloning the datasets above.
 
-  (we do not use most of the data from the MPI-FAUST dataset, just the aligned templates)
+  (Note that we do not use most of the data from the MPI-FAUST dataset, just the registered templates)
 
 
 ### Training from scratch
 
-To train the models, use
+To train the models, use:
 
 ```python
-python human_segmentation_original.py --input_features=xyz  
+python sampling_invariance.py
 ```
-or, with heat kernel signature features
-```python
-python human_segmentation_original.py --input_features=hks  
-```
-
-Note that since we do not use a validation set on this dataset (to match prior work), and simply take the accuracy at the last epoch, there is some decent variance in the final accuracy from run to run.
+which trains on the ordinary FAUST registered templates, then tests on the remeshed meshes & point cloud as described above.  The training script prints the fraction of vertices which were classified exacatly correctly; this is not a very meaningful metric, just something to give feedback during training. After the last epoch, error on the test set is reported as measured by geodesic distance along the surface between the predicted correspondence and correct correspondence.
 
 ### Evaluating pretrained models
 
-Pretrained models are included in `/pretrained_models`. You can load them and evaluate on the test set like:
+Likewise, a pretrained models is included in `/pretrained_models`. You can load it and evaluate on the test set like:
 
 ```python
-python human_segmentation_original.py --input_features=xyz --evaluate  
+python sampling_invariance.py --evaluate
 ```
-or, with heat kernel signature features
-```python
-python human_segmentation_original.py --input_features=hks --evaluate  
-```
-
