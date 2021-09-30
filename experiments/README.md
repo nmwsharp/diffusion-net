@@ -18,4 +18,4 @@ This directory contains examples and scripts to reproduce experiments from the [
   - Supervised functional correspondence on FAUST/SCAPE (coming soon!)
   - Weakly-supervised functional correspondence on FAUST/SCAPE (coming soon!)
 - **Sampling invariance**
-  - Resampled FAUST test set (coming soon!)
+  - [Resampled FAUST benchmark](https://github.com/nmwsharp/diffusion-net/tree/master/experiments/sampling_invariance/)
