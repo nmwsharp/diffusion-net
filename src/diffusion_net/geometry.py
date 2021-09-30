@@ -6,6 +6,7 @@ import scipy.sparse.linalg as sla
 import os.path
 import sys
 import random
+from multiprocessing import Pool
 
 import numpy as np
 import scipy.spatial
@@ -402,9 +403,9 @@ def get_all_operators(verts_list, faces_list, k_eig, op_cache_dir=None, normals=
     gradX = [None] * N
     gradY = [None] * N
 
-    # process in random order
     inds = [i for i in range(N)]
-    random.shuffle(inds)
+    # process in random order
+    # random.shuffle(inds)
    
     for num, i in enumerate(inds):
         print("get_all_operators() processing {} / {} {:.3f}%".format(num, N, num / N * 100))
@@ -781,7 +782,7 @@ def normalize_area_scale(verts, faces):
 
 
 
-def geodesic_label_errors(opts, target_verts, target_faces, pred_labels, gt_labels, normalization='diameter'):
+def geodesic_label_errors(target_verts, target_faces, pred_labels, gt_labels, normalization='diameter', geodesic_cache_dir=None):
     """
     Return a vector of distances between predicted and ground-truth lables (normalized by geodesic diameter or area)
 
@@ -795,7 +796,7 @@ def geodesic_label_errors(opts, target_verts, target_faces, pred_labels, gt_labe
     pred_labels = toNP(pred_labels) 
     gt_labels = toNP(gt_labels) 
 
-    dists = get_all_pairs_geodesic_distance(opts, target_verts, target_faces) 
+    dists = get_all_pairs_geodesic_distance(target_verts, target_faces, geodesic_cache_dir) 
 
     result_dists = dists[pred_labels, gt_labels]
 
@@ -816,6 +817,7 @@ def all_pairs_geodesic_worker(verts, faces, i):
 
     N = verts.shape[0]
 
+    # TODO: this re-does a ton of work, since it is called independently each time. Some custom C++ code could surely make it faster.
     sources = np.array([i])[:,np.newaxis]
     targets = np.arange(N)[:,np.newaxis]
     dist_vec = igl.exact_geodesic(verts, faces, sources, targets)
@@ -830,17 +832,23 @@ class AllPairsGeodesicEngine(object):
         return all_pairs_geodesic_worker(self.verts, self.faces, i)
 
 
-def get_all_pairs_geodesic_distance(opts, verts_np, faces_np):
+def get_all_pairs_geodesic_distance(verts_np, faces_np, geodesic_cache_dir=None):
     """
     Return a gigantic VxV dense matrix containing the all-pairs geodesic distance matrix. Internally caches, recomputing only if necessary.
 
     (numpy in, numpy out)
     """
 
+    # need libigl for geodesic call
+    try:
+        import igl
+    except ImportError as e:
+        raise ImportError("Must have python libigl installed for all-pairs geodesics. `conda install -c conda-forge igl`")
+
     # Check the cache
     found = False 
-    if opts.geodesic_cache_dir is not None:
-        utils.ensure_dir_exists(opts.geodesic_cache_dir)
+    if geodesic_cache_dir is not None:
+        utils.ensure_dir_exists(geodesic_cache_dir)
         hash_key_str = str(utils.hash_arrays((verts_np, faces_np)))
         # print("Building operators for input with hash: " + hash_key_str)
 
@@ -851,7 +859,7 @@ def get_all_pairs_geodesic_distance(opts, verts_np, faces_np):
 
             # Form the name of the file to check
             search_path = os.path.join(
-                opts.geodesic_cache_dir,
+                geodesic_cache_dir,
                 hash_key_str + "_" + str(i_cache_search) + ".npz")
 
             try:
@@ -870,12 +878,11 @@ def get_all_pairs_geodesic_distance(opts, verts_np, faces_np):
                 break
 
             except FileNotFoundError:
-                print("  cache miss -- computing all-pairs geodesic distance")
                 break
 
     if not found:
-
-        start_time = timer()
+                
+        print("Computing all-pairs geodesic distance (warning: SLOW!)")
 
         # Not found, compute from scratch
         # warning: slowwwwwww
@@ -902,11 +909,12 @@ def get_all_pairs_geodesic_distance(opts, verts_np, faces_np):
         max_dist = np.nanmax(result_dists)
         result_dists = np.nan_to_num(result_dists, nan=max_dist, posinf=max_dist, neginf=max_dist)
 
-        end_time = timer()
-        print("  geodesic computation took ", end_time - start_time)
+        print("...finished computing all-pairs geodesic distance")
 
         # put it in the cache if possible
-        if opts.geodesic_cache_dir is not None:
+        if geodesic_cache_dir is not None:
+
+            print("saving geodesic distances to cache: " + str(geodesic_cache_dir))
 
             # TODO we're potentially saving a double precision but only using a single
             # precision here; could save storage by always saving as floats
