@@ -33,7 +33,7 @@ or, with positional coordinates as features
 python human_segmentation_original.py --dataset_type=original --input_features=xyz
 ```
 
-And likewise, to train on the simplified models
+And likewise, to train on the simplified meshes
 
 ```python
 python human_segmentation_original.py --dataset_type=simplified --input_features=hks
@@ -42,4 +42,4 @@ python human_segmentation_original.py --dataset_type=simplified --input_features
 
 There will be variance in the final accuracy, because the networks generally predict just 0-3 test models incorrectly, and the test split is randomized. Perform multiple runs to get a good sample!
 
-**Note:** This experiment is configured to generate a random test/train split on each run. For this reason, no evaluation mode or pretrained models are included to avoid potential errors of testing on a set which overlaps with the train set which was used for the model.
+**Note:** This experiment is configured to generate a random test/train split on each run. For this reason, no evaluation mode or pretrained models are included to avoid potential mistakes of testing on a set which overlaps with the train set which was used for the model.
