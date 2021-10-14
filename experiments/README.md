@@ -4,8 +4,8 @@ This directory contains examples and scripts to reproduce experiments from the [
 
 - **Classification**
   - SHREC11
-    - Original meshes (coming soon!)
-    - Simplified meshes (coming soon!)
+    - [Original meshes](https://github.com/nmwsharp/diffusion-net/tree/add-shrec11/experiments/classification_shrec11)
+    - [Simplified meshes](https://github.com/nmwsharp/diffusion-net/tree/add-shrec11/experiments/classification_shrec11)
 - **Segmentation**
   - RNA Molecules
     - Meshes (coming soon!)
