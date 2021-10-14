@@ -252,7 +252,7 @@ class DiffusionNet(nn.Module):
             C_in (int):                     input dimension 
             C_out (int):                    output dimension 
             last_activation (func)          a function to apply to the final outputs of the network, such as torch.nn.functional.log_softmax (default: None)
-            outputs_at (string)             produce outputs at various mesh elements by averaging from vertices. One of ['vertices', 'edges', 'faces']. (default 'vertices', aka points for a point cloud)
+            outputs_at (string)             produce outputs at various mesh elements by averaging from vertices. One of ['vertices', 'edges', 'faces', 'global_mean']. (default 'vertices', aka points for a point cloud)
             C_width (int):                  dimension of internal DiffusionNet blocks (default: 128)
             N_block (int):                  number of DiffusionNet blocks (default: 4)
             mlp_hidden_dims (list of int):  a list of hidden layer sizes for MLPs (default: [C_width, C_width])
@@ -275,7 +275,7 @@ class DiffusionNet(nn.Module):
         # Outputs
         self.last_activation = last_activation
         self.outputs_at = outputs_at
-        if outputs_at not in ['vertices', 'edges', 'faces']: raise ValueError("invalid setting for outputs_at")
+        if outputs_at not in ['vertices', 'edges', 'faces', 'global_mean']: raise ValueError("invalid setting for outputs_at")
 
         # MLP options
         if mlp_hidden_dims == None:
@@ -389,6 +389,12 @@ class DiffusionNet(nn.Module):
             faces_gather = faces.unsqueeze(2).expand(-1, -1, x.shape[-1], -1)
             xf = torch.gather(x_gather, 1, faces_gather)
             x_out = torch.mean(xf, dim=-1)
+        
+        elif self.outputs_at == 'global_mean': 
+            # Produce a single global mean ouput.
+            # Using a weighted mean according to the point mass/area is discretization-invariant. 
+            # (A naive mean is not discretization-invariant; it could be affected by sampling a region more densely)
+            x_out = torch.sum(x * mass.unsqueeze(-1), dim=-2) / torch.sum(mass, dim=-1, keepdim=True)
         
         # Apply last nonlinearity if specified
         if self.last_activation != None:
