@@ -4,11 +4,11 @@ This directory contains examples and scripts to reproduce experiments from the [
 
 - **Classification**
   - SHREC11
-    - [Original meshes](https://github.com/nmwsharp/diffusion-net/tree/add-shrec11/experiments/classification_shrec11)
-    - [Simplified meshes](https://github.com/nmwsharp/diffusion-net/tree/add-shrec11/experiments/classification_shrec11)
+    - [Original meshes](https://github.com/nmwsharp/diffusion-net/tree/master/experiments/classification_shrec11)
+    - [Simplified meshes](https://github.com/nmwsharp/diffusion-net/tree/master/experiments/classification_shrec11)
 - **Segmentation**
   - **RNA Molecules** (data available [at this link](https://github.com/nmwsharp/RNA-Surface-Segmentation-Dataset))
-    - Meshes (coming soon!) 
+    - [Meshes](https://github.com/nmwsharp/diffusion-net/tree/master/experiments/rna_mesh_segmentation)
     - Point clouds (coming soon!)
   - Maron et al. **Human Segmentation** Dataset
     - [Original meshes](https://github.com/nmwsharp/diffusion-net/tree/master/experiments/human_segmentation_original/)
