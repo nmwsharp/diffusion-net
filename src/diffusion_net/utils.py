@@ -7,15 +7,6 @@ import hashlib
 import numpy as np
 import scipy
 
-
-# Default settings and config
-def get_default_opts():
-    class OptsObject(object):
-        pass
-    opts = OptsObject()
-    opts.eigensystem_cache_dir = None
-    return opts
-
 # == Pytorch things
 
 def toNP(x):
@@ -26,9 +17,10 @@ def toNP(x):
 
 def label_smoothing_log_loss(pred, labels, smoothing=0.0):
     n_class = pred.shape[-1]
-    one_hot = torch.zeros_like(pred).scatter(1, labels.unsqueeze(1), 1)
+    one_hot = torch.zeros_like(pred)
+    one_hot[labels] = 1.
     one_hot = one_hot * (1 - smoothing) + (1 - one_hot) * smoothing / (n_class - 1)
-    loss = -(one_hot * pred).sum(dim=1).mean()
+    loss = -(one_hot * pred).sum(dim=-1).mean()
     return loss
 
 
@@ -39,6 +31,18 @@ def random_rotate_points(pts, randgen=None):
     R = random_rotation_matrix(randgen) 
     R = torch.from_numpy(R).to(device=pts.device, dtype=pts.dtype)
     return torch.matmul(pts, R) 
+
+def random_rotate_points_y(pts):
+    angles = torch.rand(1, device=pts.device, dtype=pts.dtype) * (2. * np.pi)
+    rot_mats = torch.zeros(3, 3, device=pts.device, dtype=pts.dtype)
+    rot_mats[0,0] = torch.cos(angles)
+    rot_mats[0,2] = torch.sin(angles)
+    rot_mats[2,0] = -torch.sin(angles)
+    rot_mats[2,2] = torch.cos(angles)
+    rot_mats[1,1] = 1.
+
+    pts = torch.matmul(pts, rot_mats)
+    return pts
 
 # Numpy things
 
