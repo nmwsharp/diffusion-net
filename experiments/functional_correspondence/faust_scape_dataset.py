@@ -11,7 +11,7 @@ from utils import normalize_area_scale
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/"))  # add the path to the DiffusionNet src
 import diffusion_net
-
+from diffusion_net.utils import toNP
 
 class FaustScapeDataset(Dataset):
     def __init__(self, root_dir, name="faust", train=True, k_eig=128, n_fmap=30, use_cache=True, op_cache_dir=None):
@@ -22,6 +22,7 @@ class FaustScapeDataset(Dataset):
         self.root_dir = root_dir
         self.cache_dir = os.path.join(root_dir, name, "cache")
         self.op_cache_dir = op_cache_dir
+        self.name = name
 
         # store in memory
         self.verts_list = []
@@ -30,7 +31,7 @@ class FaustScapeDataset(Dataset):
         self.names_list = []
 
         # set combinations
-        n_train = 80 if name == "faust" else 51
+        n_train = {'faust':80, 'scape':51}[self.name]
         if self.train:
             self.combinations = list(permutations(range(n_train), 2))
         else:
@@ -39,7 +40,8 @@ class FaustScapeDataset(Dataset):
         # check the cache
         if use_cache:
             train_cache = os.path.join(self.cache_dir, "train.pt")
-            load_cache = train_cache
+            test_cache = os.path.join(self.cache_dir, "test.pt")
+            load_cache = train_cache if self.train else test_cache
             print("using dataset cache path: " + str(load_cache))
             if os.path.exists(load_cache):
                 print("  --> loading dataset from cache")
@@ -86,7 +88,7 @@ class FaustScapeDataset(Dataset):
             print("loading mesh " + str(mesh_files[iFile]))
 
             verts, faces = pp3d.read_mesh(mesh_files[iFile])
-            vts_file = np.loadtxt(vts_files[iFile]).astype(int) - 1
+            vts_file = np.loadtxt(vts_files[iFile]).astype(int)
 
             # to torch
             verts = torch.tensor(np.ascontiguousarray(verts)).float()
@@ -186,7 +188,15 @@ class FaustScapeDataset(Dataset):
         # Compute fmap
         vts1, vts2 = shape1[10], shape2[10]
         evec_1, evec_2 = shape1[6][:, :self.n_fmap], shape2[6][:, :self.n_fmap]
-        evec_1_a, evec_2_a = evec_1[vts1], evec_2[vts2]
-        C_gt = torch.lstsq(evec_2_a, evec_1_a)[0][:evec_1_a.size(-1)].t()
+        evec_1_a, evec_2_a = evec_1[vts1,:], evec_2[vts2,:]
+        solve_out = torch.lstsq(evec_2_a, evec_1_a)[0] # TODO replace with torch.linalg version in future torch
+        C_gt = solve_out[:evec_1_a.size(-1)].t()
+        resids = solve_out[evec_1_a.size(-1):]
 
+        # Alternately, do it with numpy instead:
+        # solve_out = np.linalg.lstsq(toNP(evec_1_a), toNP(evec_2_a), rcond=None)
+        # C_gt = solve_out[0]
+        # C_gt = torch.Tensor(C_gt.T)
+        # resids = torch.tensor(solve_out[1])
+        
         return (shape1, shape2, C_gt)
