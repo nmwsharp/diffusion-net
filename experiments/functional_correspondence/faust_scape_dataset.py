@@ -7,7 +7,6 @@ import torch
 from torch.utils.data import Dataset
 
 import potpourri3d as pp3d
-from utils import normalize_area_scale
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/"))  # add the path to the DiffusionNet src
 import diffusion_net
@@ -100,7 +99,7 @@ class FaustScapeDataset(Dataset):
             verts = diffusion_net.geometry.normalize_positions(verts)
 
             # normalize area
-            verts = normalize_area_scale(verts, faces)
+            verts = diffusion_net.utils.normalize_area_scale(verts, faces)
 
             self.verts_list.append(verts)
             self.faces_list.append(faces)
