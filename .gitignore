@@ -19,6 +19,7 @@ imgui.ini
 *.swp
 tags
 *.blend1
+pyrightconfig.json
 
 # Prerequisites
 *.d
@@ -52,10 +53,3 @@ tags
 *.exe
 *.out
 *.app
-
-# data folder
-experiments/functional_correspondence/data/*
-!experiments/functional_correspondence/data/.init
-!experiments/functional_correspondence/data/faust_remeshed
-!experiments/functional_correspondence/data/scape_remeshed
-!experiments/functional_correspondence/data/saved_models/
