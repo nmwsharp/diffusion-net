@@ -18,6 +18,7 @@ imgui.ini
 *.swp
 tags
 *.blend1
+pyrightconfig.json
 
 # Prerequisites
 *.d
