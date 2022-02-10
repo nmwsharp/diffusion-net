@@ -2,7 +2,7 @@
 
 Why try DiffusionNet?
 - It is _efficient_ and _scalable_. On a single GPU, we can easily train on meshes of 20k vertices, and infer on meshes with 200k vertices. One-time preprocessing takes a few seconds in the former case, and about a minute in the latter.
-- It is _sampling agnostic_. Many graph-based mesh learning approaches tend to overfit to mesh connectivity, and can output nonsense when you run them on meshes that are triangulated differently from the training set. With DiffusionNet we can intermingle very coarse or vary fine meshes without issue.
+- It is _sampling agnostic_. Many graph-based mesh learning approaches tend to overfit to mesh connectivity, and can output nonsense when you run them on meshes that are triangulated differently from the training set. With DiffusionNet we can intermingle different triangulations and very coarse or fine meshes without issue. No special regularization or data augmentation needed!
 - It is _representation agnostic_. For instance, you can train on a mesh and infer on a point cloud, or mix meshes and point clouds in the training set.
 - It is _robust_. DiffusionNet avoids potentially-brittle geometric operations, and does not impose any assumptions such as manifoldness, etc.
 - It is _data efficient_. DiffusionNet can learn from 10s of models, even without any data augmentation.
@@ -12,8 +12,6 @@ DiffusionNet is described in the paper ["DiffusionNet: Discretization Agnostic L
 - Souhaib Attaiki
 - [Keenan Crane](http://keenan.is/here)
 - [Maks Ovsjanikov](http://www.lix.polytechnique.fr/~maks/)
-
-**NOTE:** the linked paper is a _preprint_, and this code should be viewed similarly. 
 
 ![network diagram](https://github.com/nmwsharp/diffusion-net/blob/master/media/diagram.jpg)
 
@@ -97,4 +95,4 @@ By default, DiffusionNet uses _spectral acceleration_ for fast performance, whic
 
 ### Thanks
 
-Parts of this work were generously supported by the ERC Starting Grant No. 758800 (EXPROTEA) the ANR AI Chair AIGRETTE, a Packard Fellowship, NSF CAREER Award 1943123, an NSF Graduate Research Fellowship, and gifts from Activision Blizzard, Adobe, Disney, Facebook, and nTopology. The dataset loaders mimic code from [HSN](https://github.com/rubenwiersma/hsn), [pytorch-geometric](https://github.com/rusty1s/pytorch_geometric), and probably indirectly from other sources too. Thank you!
+Parts of this work were generously supported by the Fields Institute for Mathematics, the Vector Institute, ERC Starting Grant No. 758800 (EXPROTEA) the ANR AI Chair AIGRETTE, a Packard Fellowship, NSF CAREER Award 1943123, an NSF Graduate Research Fellowship, and gifts from Activision Blizzard, Adobe, Disney, Facebook, and nTopology. The dataset loaders mimic code from [HSN](https://github.com/rubenwiersma/hsn), [pytorch-geometric](https://github.com/rusty1s/pytorch_geometric), and probably indirectly from other sources too. Thank you!
