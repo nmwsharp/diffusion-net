@@ -16,6 +16,8 @@ from diffusion_net.utils import toNP
 class FaustScapeDataset(Dataset):
     def __init__(self, root_dir, name="faust", train=True, k_eig=128, n_fmap=30, use_cache=True, op_cache_dir=None):
 
+        # NOTE: These datasets are setup such that each dataset object always loads the entire dataset regardless of train/test mode. The correspondence pair combinations are then set such that the train dataset only returns train pairs, and the test dataset only returns test pairs. Be aware of this if you try to adapt the code for any other purpose!
+
         self.train = train  # bool
         self.k_eig = k_eig
         self.n_fmap = n_fmap
@@ -69,8 +71,8 @@ class FaustScapeDataset(Dataset):
         vts_files = []
 
         # load faust data
-        mesh_dirpath = os.path.join(self.root_dir, name, "shapes")
-        vts_dirpath = os.path.join(self.root_dir, name, "correspondences")
+        mesh_dirpath = os.path.join(self.root_dir, name, "off_2")
+        vts_dirpath = os.path.join(self.root_dir, name, "corres")
         for fname in os.listdir(mesh_dirpath):
             mesh_fullpath = os.path.join(mesh_dirpath, fname)
             vts_fullpath = os.path.join(vts_dirpath, fname[:-4] + ".vts")
@@ -79,7 +81,6 @@ class FaustScapeDataset(Dataset):
 
         print("loading {} meshes".format(len(mesh_files)))
 
-        # TODO verify that they are sorted correctly
         mesh_files, vts_files = sorted(mesh_files), sorted(vts_files)
 
         # Load the actual files
@@ -88,7 +89,7 @@ class FaustScapeDataset(Dataset):
             print("loading mesh " + str(mesh_files[iFile]))
 
             verts, faces = pp3d.read_mesh(mesh_files[iFile])
-            vts_file = np.loadtxt(vts_files[iFile]).astype(int)
+            vts_file = np.loadtxt(vts_files[iFile]).astype(int) - 1 # convert from 1-based indexing
 
             # to torch
             verts = torch.tensor(np.ascontiguousarray(verts)).float()
