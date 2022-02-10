@@ -1,7 +1,6 @@
 import os
 import sys
 import argparse
-from sklearn.metrics import jaccard_score
 from tqdm import tqdm
 import numpy as np
 
