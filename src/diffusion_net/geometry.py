@@ -423,7 +423,7 @@ def get_all_operators(verts_list, faces_list, k_eig, op_cache_dir=None, normals=
         
     return frames, massvec, L, evals, evecs, gradX, gradY
 
-def get_operators(verts, faces, k_eig=128, op_cache_dir=None, normals=None, overwrite_cache=False, truncate_cache=False):
+def get_operators(verts, faces, k_eig=128, op_cache_dir=None, normals=None, overwrite_cache=False):
     """
     See documentation for compute_operators(). This essentailly just wraps a call to compute_operators, using a cache if possible.
     All arrays are always computed using double precision for stability, then truncated to single precision floats to store on disk, and finally returned as a tensor with dtype/device matching the `verts` input.
@@ -506,32 +506,9 @@ def get_operators(verts, faces, k_eig=128, op_cache_dir=None, normals=None, over
                 mass = npzfile["mass"]
                 L = read_sp_mat("L")
                 evals = npzfile["evals"][:k_eig]
-                evecs = npzfile["evecs"][:, :k_eig]
+                evecs = npzfile["evecs"][:,:k_eig]
                 gradX = read_sp_mat("gradX")
                 gradY = read_sp_mat("gradY")
-
-                if truncate_cache and cache_k_eig > k_eig:
-                    print("TRUNCATING CACHE {} --> {}".format(cache_k_eig, k_eig))
-                    np.savez(search_path,
-                             verts=verts_np,
-                             frames=frames,
-                             faces=faces_np,
-                             k_eig=k_eig,
-                             mass=mass,
-                             L_data = L_np.data,
-                             L_indices = L_np.indices,
-                             L_indptr = L_np.indptr,
-                             L_shape = L_np.shape,
-                             gradX_data = gradX_np.data,
-                             gradX_indices = gradX_np.indices,
-                             gradX_indptr = gradX_np.indptr,
-                             gradX_shape = gradX_np.shape,
-                             gradY_data = gradY_np.data,
-                             gradY_indices = gradY_np.indices,
-                             gradY_indptr = gradY_np.indptr,
-                             gradY_shape = gradY_np.shape,
-                             )
-
 
                 frames = torch.from_numpy(frames).to(device=device, dtype=dtype)
                 mass = torch.from_numpy(mass).to(device=device, dtype=dtype)
