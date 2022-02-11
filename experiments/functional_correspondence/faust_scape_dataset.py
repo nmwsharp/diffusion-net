@@ -98,9 +98,6 @@ class FaustScapeDataset(Dataset):
             # center and unit scale
             verts = diffusion_net.geometry.normalize_positions(verts)
 
-            # normalize area
-            verts = diffusion_net.utils.normalize_area_scale(verts, faces)
-
             self.verts_list.append(verts)
             self.faces_list.append(faces)
             self.vts_list.append(vts_file)
@@ -185,7 +182,7 @@ class FaustScapeDataset(Dataset):
             self.names_list[idx2],
         ]
 
-        # Compute fmap
+        # Compute the ground-truth functional map between the pair
         vts1, vts2 = shape1[10], shape2[10]
         evec_1, evec_2 = shape1[6][:, :self.n_fmap], shape2[6][:, :self.n_fmap]
         evec_1_a, evec_2_a = evec_1[vts1,:], evec_2[vts2,:]
