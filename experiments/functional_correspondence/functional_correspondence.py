@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import random
 from tqdm import tqdm
 import numpy as np
 
@@ -24,13 +25,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--evaluate", action="store_true", help="evaluate using the pretrained model")
 parser.add_argument("--train_dataset", type=str, default="faust", help="what dataset to train on")
 parser.add_argument("--test_dataset", type=str, default="faust", help="what dataset to test on")
-parser.add_argument("--input_features", type=str, help="what features to use as input ('xyz' or 'hks') default: xyz", default = 'xyz')
+parser.add_argument("--input_features", type=str, help="what features to use as input ('xyz' or 'hks') default: hks", default = 'hks')
 parser.add_argument("--load_model", type=str, help="path to load a pretrained model from")
 args = parser.parse_args()
 
-
 # system things
-device = torch.device('cuda:0')
+device = torch.device('cuda')
 dtype = torch.float32
 
 # model 
@@ -44,10 +44,10 @@ lambda_param = 1e-3 # functional map block regularization parameter
 
 # training settings
 train = not args.evaluate
-n_epoch = 10
-lr = 1e-3
-decay_every = 99999
-decay_rate = 0.5
+n_epoch = 5
+lr = 5e-4
+decay_every = 9999
+decay_rate = 0.1
 augment_random_rotate = (input_features == 'xyz')
 
 
@@ -61,9 +61,10 @@ diffusion_net.utils.ensure_dir_exists(os.path.join(base_path, "saved_models/"))
 
 
 # === Load datasets
-    
-train_dataset = FaustScapeDataset(dataset_path, name=args.train_dataset, train=True, k_eig=k_eig, n_fmap=n_fmap, use_cache=True, op_cache_dir=op_cache_dir)
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=None, shuffle=True)
+
+if not args.evaluate: 
+    train_dataset = FaustScapeDataset(dataset_path, name=args.train_dataset, train=True, k_eig=k_eig, n_fmap=n_fmap, use_cache=True, op_cache_dir=op_cache_dir)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=None, shuffle=True)
 
 test_dataset = FaustScapeDataset(dataset_path, name=args.test_dataset, train=False, k_eig=k_eig, n_fmap=n_fmap, use_cache=True, op_cache_dir=op_cache_dir)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=None, shuffle=False)
@@ -88,6 +89,9 @@ if args.load_model:
     print("Loading pretrained model from: " + str(args.load_model))
     model.load_state_dict(torch.load(args.load_model))
     print("...done")
+
+if args.evaluate and not args.load_model:
+    raise ValueError("Called with --evaluate but not --load_model. This will evaluate on a randomly initialized model, which is probably not what you want to do.")
 
 
 # === Optimize
@@ -119,9 +123,8 @@ def train_epoch(epoch):
 
         # Randomly rotate positions
         if augment_random_rotate:
-            # Rotate about up (Y-axis) 
-            shape1[0] = diffusion_net.utils.random_rotate_points_y(shape1[0])
-            shape2[0] = diffusion_net.utils.random_rotate_points_y(shape2[0])
+            shape1[0] = diffusion_net.utils.random_rotate_points(shape1[0])
+            shape2[0] = diffusion_net.utils.random_rotate_points(shape2[0])
 
         # Apply the model
         C_pred, feat1, feat2 = model(shape1, shape2)
@@ -161,12 +164,10 @@ def test(with_geodesic_error=False):
             *shape2, name2 = shape2 
             shape1, shape2, C_gt = [x.to(device) for x in shape1], [x.to(device) for x in shape2], C_gt.to(device)
         
-            # Randomly rotate positions
-            verts1_orig = shape1[0]  # we use these below to cache geodesic distance
+            verts1_orig = shape1[0]
             if augment_random_rotate:
-                # Rotate about up (Y-axis) 
-                shape1[0] = diffusion_net.utils.random_rotate_points_y(shape1[0])
-                shape2[0] = diffusion_net.utils.random_rotate_points_y(shape2[0])
+                shape1[0] = diffusion_net.utils.random_rotate_points(shape1[0])
+                shape2[0] = diffusion_net.utils.random_rotate_points(shape2[0])
 
             # Apply the model
             C_pred, feat1, feat2 = model(shape1, shape2)
@@ -202,19 +203,18 @@ def test(with_geodesic_error=False):
                 geodesic_error = toNP(torch.mean(errors))
                 geodesic_errors.append(geodesic_error)
 
+
     mean_loss = np.mean(losses)
     mean_geodesic_error = np.mean(geodesic_errors) if with_geodesic_error else -1
 
     return mean_loss, mean_geodesic_error
-
-test_with_geodesic_error = args.evaluate
 
 if train:
     print("Training...")
 
     for epoch in range(n_epoch):
         train_loss = train_epoch(epoch)
-        test_loss, test_geodesic_error = test(with_geodesic_error=False)
+        test_loss, test_geodesic_error = test(with_geodesic_error=True)
         print("Epoch {} - Train overall: {:.5e}  Test overall: {:.5e}  Test geodesic error: {:.5e}".format(epoch, train_loss, test_loss, test_geodesic_error))
 
         print(" ==> saving last model to " + model_save_path)
@@ -222,5 +222,5 @@ if train:
 
 
 # Test
-mean_loss, mean_geodesic_error = test(with_geodesic_error=test_with_geodesic_error)
+mean_loss, mean_geodesic_error = test(with_geodesic_error=True)
 print("Overall test accuracy: {:.5e}  geodesic error: {:.5e}".format(mean_loss, mean_geodesic_error))

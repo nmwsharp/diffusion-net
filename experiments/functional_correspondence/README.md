@@ -45,7 +45,7 @@ Passing `--train_dataset=scape` trains on the SCAPE dataset instead.
 
 After training, the fitted model will be saved in `saved_models/[dataset]_[features].pth`.
 
-These training commands only output the accuracy loss, not the geodesic error reported in our tables. To evaluate geodesic error, see the next section.
+During training, geodesic error metrics are computed on the test set after each iteration; see the note below.
 
 ### Pretrained models and evaluating geodesic accuracy
 

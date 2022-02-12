@@ -12,6 +12,21 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/"))  # add th
 import diffusion_net
 from diffusion_net.utils import toNP
 
+def normalize_area_scale(verts, faces):
+    coords = verts[faces]
+    vec_A = coords[:, 1, :] - coords[:, 0, :]
+    vec_B = coords[:, 2, :] - coords[:, 0, :]
+    face_areas = torch.norm(torch.cross(vec_A, vec_B, dim=-1), dim=1) * 0.5
+    total_area = torch.sum(face_areas)
+
+    scale = (1 / torch.sqrt(total_area))
+    verts = verts * scale
+
+    # center
+    verts = verts - verts.mean(dim=-2, keepdim=True)
+
+    return verts
+
 class FaustScapeDataset(Dataset):
     def __init__(self, root_dir, name="faust", train=True, k_eig=128, n_fmap=30, use_cache=True, op_cache_dir=None):
 
@@ -95,8 +110,8 @@ class FaustScapeDataset(Dataset):
             faces = torch.tensor(np.ascontiguousarray(faces))
             vts_file = torch.tensor(np.ascontiguousarray(vts_file))
 
-            # center and unit scale
-            verts = diffusion_net.geometry.normalize_positions(verts)
+            # center and unit-area scale
+            verts = diffusion_net.geometry.normalize_positions(verts, faces=faces, scale_method='area')
 
             self.verts_list.append(verts)
             self.faces_list.append(faces)

@@ -46,7 +46,7 @@ class FunctionalMapCorrespondenceWithDiffusionNetFeatures(nn.Module):
     def __init__(self, n_feat=128, n_fmap=30, lambda_=1e-3, input_features="xyz", lambda_param=1e-3):
         super().__init__()
 
-        C_in = 3 if input_features == "xyz" else 16
+        C_in={'xyz':3, 'hks':16}[input_features] # dimension of input features
 
         self.feature_extractor = diffusion_net.layers.DiffusionNet(
             C_in=C_in,
