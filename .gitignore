@@ -29,6 +29,9 @@ pyrightconfig.json
 *.lo
 *.o
 *.obj
+*.off
+*.ply
+*.zip
 
 # Precompiled Headers
 *.gch
