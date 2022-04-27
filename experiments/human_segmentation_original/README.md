@@ -29,3 +29,13 @@ or, with heat kernel signature features
 python human_segmentation_original.py --input_features=hks --evaluate  
 ```
 
+### results
+
+##### gt lable
+
+![gt_label](https://github.com/Yannnnnnnnnnnn/diffusion-net/blob/master/experiments/human_segmentation_original/fig/gt1_viz.png)
+
+###### pr label
+
+![pr_label](https://github.com/Yannnnnnnnnnnn/diffusion-net/blob/master/experiments/human_segmentation_original/fig/pr1_viz.png)
+
