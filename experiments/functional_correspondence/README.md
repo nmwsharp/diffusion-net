@@ -54,7 +54,7 @@ During training, geodesic error metrics are computed on the test set after each 
 Compute geodesic accuracy of a trained model by running with the `--evaluate` flag. Load any pretrained model from disk with `--load_model=PATH_TO_MODEL.pth`. In this case, the `train_dataset` argument is ignored.
 
 ```python
-python functional_correspondence.py --test_dataset=faust --input_features=hks --load_model=pretrained_models/faust_xyz.pth
+python functional_correspondence.py --test_dataset=faust --input_features=xyz --load_model=pretrained_models/faust_xyz.pth
 ```
 
 We include several pretrained models in the `pretrained_models/` directory for both FAUST and SCAPE, as well as `xyz` and `hks` features.
