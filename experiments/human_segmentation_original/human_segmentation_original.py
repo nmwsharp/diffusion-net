@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
+import trimesh
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/"))  # add the path to the DiffusionNet src
 import diffusion_net
@@ -52,7 +53,7 @@ dataset_path = os.path.join(base_path, "data/sig17_seg_benchmark")
 # === Load datasets
 
 # Load the test dataset
-test_dataset = HumanSegOrigDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
+test_dataset = HumanSegOrigDataset(dataset_path, train=False, k_eig=k_eig, use_cache=False, op_cache_dir=op_cache_dir)
 test_loader = DataLoader(test_dataset, batch_size=None)
 
 # Load the train dataset
@@ -105,7 +106,7 @@ def train_epoch(epoch):
     for data in tqdm(train_loader):
 
         # Get data
-        verts, faces, frames, mass, L, evals, evecs, gradX, gradY, labels = data
+        verts, faces, frames, mass, L, evals, evecs, gradX, gradY, labels, _ = data
 
         # Move to device
         verts = verts.to(device)
@@ -151,6 +152,42 @@ def train_epoch(epoch):
     return train_acc
 
 
+# borrow code from subdivnet
+# https://github.com/lzhengning/SubdivNet/blob/master/subdivnet/utils.py
+segment_colors = np.array([
+    [0, 114, 189],
+    [217, 83, 26],
+    [238, 177, 32],
+    [126, 47, 142],
+    [117, 142, 48],
+    [76, 190, 238],
+    [162, 19, 48],
+    [240, 166, 202],
+])
+
+def save_results(mesh_path, preds, labels):
+
+    if not os.path.exists('results'):
+        os.mkdir('results')
+
+    labels = labels.cpu().numpy()
+    preds  = preds.cpu().numpy()
+
+    save_path = './results'
+
+    mesh = trimesh.load_mesh(mesh_path, process=False)
+    mesh_name = os.path.basename(mesh_path)[:-4]
+
+    # print('mesh_path',mesh_path)
+    # print('mesh_name',mesh_name)
+    # print(save_path + '/pr-' + mesh_name + '.ply')
+
+    mesh.visual.face_colors[:, :3] = segment_colors[preds]
+    mesh.export(save_path + '/pr-' + mesh_name + '.ply')
+
+    mesh.visual.face_colors[:, :3] = segment_colors[labels]
+    mesh.export(save_path + '/gt-' + mesh_name + '.ply')
+
 # Do an evaluation pass on the test dataset 
 def test():
     
@@ -163,7 +200,7 @@ def test():
         for data in tqdm(test_loader):
 
             # Get data
-            verts, faces, frames, mass, L, evals, evecs, gradX, gradY, labels = data
+            verts, faces, frames, mass, L, evals, evecs, gradX, gradY, labels, mesh_file = data
 
             # Move to device
             verts = verts.to(device)
@@ -185,9 +222,16 @@ def test():
 
             # Apply the model
             preds = model(features, mass, L=L, evals=evals, evecs=evecs, gradX=gradX, gradY=gradY, faces=faces)
+            pred_labels = torch.max(preds, dim=1).indices
+
+            # save
+            print('mesh_file',mesh_file)
+            print('pred',pred_labels.shape)
+            print('labels',labels.shape)
+            save_results(mesh_file,pred_labels,labels)
 
             # track accuracy
-            pred_labels = torch.max(preds, dim=1).indices
+            
             this_correct = pred_labels.eq(labels).sum().item()
             this_num = labels.shape[0]
             correct += this_correct
