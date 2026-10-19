@@ -212,60 +212,43 @@ def build_grad(verts, edges, edge_tangent_vectors):
     - edges: (2, E)
     """
     
-    edges_np = toNP(edges)
-    edge_tangent_vectors_np = toNP(edge_tangent_vectors)
+    edges_np = toNP(edges).astype(np.int64)
+    edge_tangent_vectors_np = toNP(edge_tangent_vectors).astype(np.float64)
 
-    # TODO find a way to do this in pure numpy?
+    # At each vertex, solve the regularized least-squares problem
+    #   (E^T E + eps_reg I) g = E^T (f_j - f_i)
+    # where the rows of E are the tangent vectors of the outgoing edges. The 2x2 system is
+    # inverted in closed form for all vertices at once, rather than with a per-vertex loop.
 
-    # Build outgoing neighbor lists
+    # Keep only outgoing edges which are not self-loops
     N = verts.shape[0]
-    vert_edge_outgoing = [[] for i in range(N)]
-    for iE in range(edges_np.shape[1]):
-        tail_ind = edges_np[0, iE]
-        tip_ind = edges_np[1, iE]
-        if tip_ind != tail_ind:
-            vert_edge_outgoing[tail_ind].append(iE)
+    mask = edges_np[0, :] != edges_np[1, :]
+    tail_inds = edges_np[0, mask]
+    tip_inds = edges_np[1, mask]
+    edge_x = edge_tangent_vectors_np[mask, 0]
+    edge_y = edge_tangent_vectors_np[mask, 1]
 
-    # Build local inversion matrix for each vertex
-    row_inds = []
-    col_inds = []
-    data_vals = []
+    # Accumulate the entries of the (symmetric) 2x2 matrix E^T E + eps_reg I at each vertex
     eps_reg = 1e-5
-    for iV in range(N):
-        n_neigh = len(vert_edge_outgoing[iV])
+    lhs_xx = np.bincount(tail_inds, weights=edge_x * edge_x, minlength=N) + eps_reg
+    lhs_xy = np.bincount(tail_inds, weights=edge_x * edge_y, minlength=N)
+    lhs_yy = np.bincount(tail_inds, weights=edge_y * edge_y, minlength=N) + eps_reg
+    lhs_det = lhs_xx * lhs_yy - lhs_xy * lhs_xy
 
-        lhs_mat = np.zeros((n_neigh, 2))
-        rhs_mat = np.zeros((n_neigh, n_neigh + 1))
-        ind_lookup = [iV]
-        for i_neigh in range(n_neigh):
-            iE = vert_edge_outgoing[iV][i_neigh]
-            jV = edges_np[1, iE]
-            ind_lookup.append(jV)
-    
-            edge_vec = edge_tangent_vectors[iE][:]
-            w_e = 1.
+    # Apply the inverse [[yy, -xy], [-xy, xx]] / det to each edge vector, giving the
+    # coefficient of the tip vertex in the gradient at the tail vertex
+    coef_x = (lhs_yy[tail_inds] * edge_x - lhs_xy[tail_inds] * edge_y) / lhs_det[tail_inds]
+    coef_y = (lhs_xx[tail_inds] * edge_y - lhs_xy[tail_inds] * edge_x) / lhs_det[tail_inds]
+    edge_coefs = coef_x + 1j * coef_y
 
-            lhs_mat[i_neigh][:] = w_e * edge_vec
-            rhs_mat[i_neigh][0] = w_e * (-1)
-            rhs_mat[i_neigh][i_neigh + 1] = w_e * 1
-
-        lhs_T = lhs_mat.T
-        lhs_inv = np.linalg.inv(lhs_T @ lhs_mat + eps_reg * np.identity(2)) @ lhs_T
-
-        sol_mat = lhs_inv @ rhs_mat
-        sol_coefs = (sol_mat[0, :] + 1j * sol_mat[1, :]).T
-
-        for i_neigh in range(n_neigh + 1):
-            i_glob = ind_lookup[i_neigh]
-
-            row_inds.append(iV)
-            col_inds.append(i_glob)
-            data_vals.append(sol_coefs[i_neigh])
+    # The coefficient of the vertex itself is minus the sum over its outgoing edges
+    diag_coefs = -(np.bincount(tail_inds, weights=coef_x, minlength=N) +
+                   1j * np.bincount(tail_inds, weights=coef_y, minlength=N))
 
     # build the sparse matrix
-    row_inds = np.array(row_inds)
-    col_inds = np.array(col_inds)
-    data_vals = np.array(data_vals)
+    row_inds = np.concatenate((np.arange(N), tail_inds))
+    col_inds = np.concatenate((np.arange(N), tip_inds))
+    data_vals = np.concatenate((diag_coefs, edge_coefs))
     mat = scipy.sparse.coo_matrix(
         (data_vals, (row_inds, col_inds)), shape=(
             N, N)).tocsc()
